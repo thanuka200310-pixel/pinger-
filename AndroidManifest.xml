@@ -7,6 +7,7 @@
 
     <application
         android:allowBackup="true"
+        android:icon="@android:drawable/stat_notify_sync"
         android:label="Z Pinger Lite">
 
         <activity
@@ -22,6 +23,17 @@
             android:name=".KeepAliveService"
             android:enabled="true"
             android:exported="false" />
+
+        <service
+            android:name="com.hutch.pingerlite.KeepAliveService$PingerTile"
+            android:label="Z Pinger"
+            android:icon="@android:drawable/stat_notify_sync"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
     </application>
 </manifest>
