@@ -1,0 +1,23 @@
+name: Build APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build & Sign APK
+        run: |
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          PLATFORM=$(ls -d $ANDROID_HOME/platforms/android-[0-9]* | grep -E '/android-[0-9]+$' | sort -V | tail -n 1)
+          "$BUILD_TOOLS/aapt2" link -I "$PLATFORM/android.jar" --manifest AndroidManifest.xml --min-sdk-version 21 --target-sdk-version 30 -o unaligned.apk
+          mkdir -p obj
+          javac -source 1.8 -target 1.8 -classpath "$PLATFORM/android.jar" -d obj MainActivity.java KeepAliveService.java
+          "$BUILD_TOOLS/d8" --lib "$PLATFORM/android.jar" --min-api 21 --output . obj/com/hutch/pingerlite/*.class
+          zip -j unaligned.apk classes.dex
+          "$BUILD_TOOLS/zipalign" -p 4 unaligned.apk aligned.apk
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          "$BUILD_TOOLS/apksigner" sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android --out ZPingerLite.apk aligned.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZPingerLite-APK
+          path: ZPingerLite.apk
