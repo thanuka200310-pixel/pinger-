@@ -8,10 +8,8 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
-import android.service.quicksettings.Tile;
-import android.service.quicksettings.TileService;
-import java.net.InetSocketAddress;
-import java.net.Socket;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -25,7 +23,7 @@ public class KeepAliveService extends Service {
         super.onCreate();
         isRunning = true;
         startForegroundServiceNotification();
-        startLightPinger();
+        startTurboPinger();
     }
 
     private void startForegroundServiceNotification() {
@@ -48,8 +46,8 @@ public class KeepAliveService extends Service {
         }
 
         Notification notification = builder
-                .setContentTitle("Z Pinger Lite Active")
-                .setContentText("Keeping 4G+/H+ Awake (Every 5s)")
+                .setContentTitle("Z Pinger TURBO Active")
+                .setContentText("High-Speed Data Channel Locked (1.5s)")
                 .setSmallIcon(android.R.drawable.stat_notify_sync)
                 .addAction(android.R.drawable.ic_media_pause, "STOP PINGER", stopPendingIntent)
                 .build();
@@ -57,16 +55,25 @@ public class KeepAliveService extends Service {
         startForeground(1, notification);
     }
 
-    private void startLightPinger() {
+    private void startTurboPinger() {
         scheduler = Executors.newSingleThreadScheduledExecutor();
-        scheduler.scheduleAtFixedRate(() -> {
+        // හැම තත්පර 1.5කට (1500ms) සැරයක්ම High-Speed HTTP පැකට් එකක් යවනවා
+        scheduler.scheduleWithFixedDelay(() -> {
+            HttpURLConnection conn = null;
             try {
-                Socket socket = new Socket();
-                socket.connect(new InetSocketAddress("8.8.8.8", 53), 2000);
-                socket.close();
+                // මේ Google 204 සර්වර් එකෙන් තමයි ටවර් එකේ High-Speed මෝඩ් එක ඇහැරවන්නේ
+                URL url = new URL("http://connectivitycheck.gstatic.com/generate_204");
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("HEAD");
+                conn.setRequestProperty("Connection", "Keep-Alive");
+                conn.setConnectTimeout(1500);
+                conn.setReadTimeout(1500);
+                conn.getResponseCode();
             } catch (Exception e) {
+            } finally {
+                if (conn != null) conn.disconnect();
             }
-        }, 0, 5, TimeUnit.SECONDS);
+        }, 0, 1500, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -89,41 +96,5 @@ public class KeepAliveService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return null;
-    }
-
-    // මේ කොටසින් තමයි Notification Panel එකට Icon එක (Quick Tile) හදලා දෙන්නේ
-    public static class PingerTile extends TileService {
-        @Override
-        public void onStartListening() {
-            super.onStartListening();
-            updateTileState();
-        }
-
-        @Override
-        public void onClick() {
-            super.onClick();
-            Intent intent = new Intent(this, KeepAliveService.class);
-            if (KeepAliveService.isRunning) {
-                stopService(intent);
-                KeepAliveService.isRunning = false;
-            } else {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(intent);
-                } else {
-                    startService(intent);
-                }
-                KeepAliveService.isRunning = true;
-            }
-            updateTileState();
-        }
-
-        private void updateTileState() {
-            Tile tile = getQsTile();
-            if (tile != null) {
-                tile.setState(KeepAliveService.isRunning ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE);
-                tile.setLabel(KeepAliveService.isRunning ? "Pinger ON" : "Z Pinger");
-                tile.updateTile();
-            }
-        }
     }
 }
