@@ -11,9 +11,8 @@ import android.os.IBinder;
 import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
 import android.widget.Toast;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.net.URL;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -28,7 +27,7 @@ public class KeepAliveService extends Service {
         super.onCreate();
         isRunning = true;
         startForegroundServiceNotification();
-        startTurboPinger();
+        startSmartTurboPinger();
     }
 
     private void startForegroundServiceNotification() {
@@ -52,8 +51,8 @@ public class KeepAliveService extends Service {
         }
 
         Notification notification = builder
-                .setContentTitle("Z Pinger TURBO Active 🚀")
-                .setContentText("High-Speed 4G+/H+ Locked (Every 1s)")
+                .setContentTitle("Z Pinger Smart-Turbo ⚡")
+                .setContentText("Fast Speed + Battery/Charge Friendly (2.5s)")
                 .setSmallIcon(android.R.drawable.stat_notify_sync)
                 .addAction(android.R.drawable.ic_media_pause, "STOP PINGER", stopPendingIntent)
                 .build();
@@ -61,30 +60,26 @@ public class KeepAliveService extends Service {
         startForeground(1, notification);
     }
 
-    private void startTurboPinger() {
+    private void startSmartTurboPinger() {
         scheduler = Executors.newSingleThreadScheduledExecutor();
-        // හැම තත්පර 1කටම (1000ms) සැරයක් HTTP + DNS පැකට් යවලා ටවර් එක High-Speed තියාගන්නවා
+        // තත්පර 2.5කට (2500ms) සැරයක් එකම Open Connection එක පාවිච්චි කරනවා (බැටරි කන්නේ නෑ)
         scheduler.scheduleWithFixedDelay(() -> {
-            HttpURLConnection conn = null;
             try {
                 URL url = new URL("http://connectivitycheck.gstatic.com/generate_204");
-                conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setUseCaches(false);
-                conn.setConnectTimeout(1000);
-                conn.setReadTimeout(1000);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("HEAD");
+                conn.setRequestProperty("Connection", "keep-alive");
+                conn.setConnectTimeout(2000);
+                conn.setReadTimeout(2000);
                 conn.getResponseCode();
+                
+                // disconnect() කරන්නේ නැතුව stream එක විතරක් වහනවා.
+                // එතකොට ෆෝන් එකට අලුතින් කනෙක්ෂන් හදන්න මහන්සි වෙන්න ඕනේ නෑ!
+                InputStream is = conn.getInputStream();
+                if (is != null) is.close();
             } catch (Exception e) {
-                try {
-                    Socket socket = new Socket();
-                    socket.connect(new InetSocketAddress("1.1.1.1", 53), 1000);
-                    socket.close();
-                } catch (Exception ex) {
-                }
-            } finally {
-                if (conn != null) conn.disconnect();
             }
-        }, 0, 1000, TimeUnit.MILLISECONDS);
+        }, 0, 2500, TimeUnit.MILLISECONDS);
     }
 
     @Override
@@ -110,7 +105,6 @@ public class KeepAliveService extends Service {
         return null;
     }
 
-    // උඩ Notification Bar එකේ Icon එක වැඩ කරවන කොටස
     public static class PingerTile extends TileService {
         @Override
         public void onStartListening() {
@@ -133,7 +127,7 @@ public class KeepAliveService extends Service {
                     getApplicationContext().startService(intent);
                 }
                 KeepAliveService.isRunning = true;
-                Toast.makeText(getApplicationContext(), "Z Pinger TURBO ON 🚀", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getApplicationContext(), "Smart-Turbo ON ⚡", Toast.LENGTH_SHORT).show();
             }
             updateTile();
         }
